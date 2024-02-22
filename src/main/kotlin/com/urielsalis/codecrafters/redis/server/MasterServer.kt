@@ -9,6 +9,8 @@ import java.net.ServerSocket
 class MasterServer(serverSocket: ServerSocket, storage: Storage) :
     Server(serverSocket, storage, "8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb", 0) {
 
+    val replicas = mutableListOf<Client>()
+
     override fun getRole() = "master"
     override fun handleUnknownCommand(
         client: Client, commandName: String, commandArgs: List<String>
@@ -16,6 +18,11 @@ class MasterServer(serverSocket: ServerSocket, storage: Storage) :
         when (commandName) {
             "replconf" -> {
                 client.sendMessage(SimpleStringRespMessage("OK"))
+            }
+
+            "psync" -> {
+                replicas.add(client)
+                client.sendMessage(SimpleStringRespMessage("FULLRESYNC $replId $replOffset"))
             }
 
             else -> {
