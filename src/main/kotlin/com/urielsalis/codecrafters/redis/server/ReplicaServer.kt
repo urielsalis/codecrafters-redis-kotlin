@@ -5,10 +5,12 @@ import com.urielsalis.codecrafters.redis.resp.ArrayRespMessage
 import com.urielsalis.codecrafters.redis.resp.BulkStringBytesRespMessage
 import com.urielsalis.codecrafters.redis.resp.BulkStringRespMessage
 import com.urielsalis.codecrafters.redis.resp.ErrorRespMessage
+import com.urielsalis.codecrafters.redis.resp.RespMessage
 import com.urielsalis.codecrafters.redis.resp.SimpleStringRespMessage
 import com.urielsalis.codecrafters.redis.storage.Storage
 import java.net.ServerSocket
 import java.net.Socket
+import java.time.Instant
 
 class ReplicaServer(
     val serverSocket: ServerSocket, storage: Storage, masterHost: String, masterPort: Int
@@ -51,5 +53,13 @@ class ReplicaServer(
         val argsResp = args.map { BulkStringRespMessage(it) }.toTypedArray()
         val message = ArrayRespMessage(listOf(BulkStringRespMessage(command), *argsResp))
         client.sendMessage(message)
+    }
+
+    override fun set(key: String, value: RespMessage, expiry: Instant): RespMessage {
+        return ErrorRespMessage("READONLY You can't write against a read only replica.")
+    }
+
+    override fun replicate(command: ArrayRespMessage) {
+        // No need to do anything here
     }
 }

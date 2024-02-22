@@ -6,6 +6,7 @@ import com.urielsalis.codecrafters.redis.resp.BulkStringBytesRespMessage
 import com.urielsalis.codecrafters.redis.resp.BulkStringRespMessage
 import com.urielsalis.codecrafters.redis.resp.ErrorRespMessage
 import com.urielsalis.codecrafters.redis.resp.NullRespMessage
+import com.urielsalis.codecrafters.redis.resp.RespMessage
 import com.urielsalis.codecrafters.redis.resp.SimpleStringRespMessage
 import com.urielsalis.codecrafters.redis.storage.Storage
 import java.net.ServerSocket
@@ -14,7 +15,7 @@ import kotlin.concurrent.thread
 
 abstract class Server(
     private val serverSocket: ServerSocket,
-    private val storage: Storage,
+    protected val storage: Storage,
     initialReplId: String,
     initialReplOffset: Long
 ) {
@@ -72,8 +73,14 @@ abstract class Server(
                     } else {
                         Instant.MAX
                     }
-                    storage.set(commandArgs[0], BulkStringRespMessage(commandArgs[1]), expiry)
-                    client.sendMessage(SimpleStringRespMessage("OK"))
+                    client.sendMessage(
+                        set(
+                            commandArgs[0],
+                            BulkStringRespMessage(commandArgs[1]),
+                            expiry
+                        )
+                    )
+                    replicate(command)
                 }
             }
 
@@ -108,6 +115,10 @@ abstract class Server(
             }
         }
     }
+
+    abstract fun replicate(command: ArrayRespMessage)
+
+    abstract fun set(key: String, value: RespMessage, expiry: Instant): RespMessage
 
     abstract fun getRole(): String
 
