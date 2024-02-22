@@ -2,7 +2,7 @@ package com.urielsalis.codecrafters.redis
 
 import java.net.Socket
 
-class Client(val clientSocket: Socket) {
+class Client(clientSocket: Socket) {
     private val connectionManager = ConnectionManager(clientSocket)
     fun handle() {
         while (true) {

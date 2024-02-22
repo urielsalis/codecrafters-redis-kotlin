@@ -5,7 +5,7 @@ import java.io.Closeable
 import java.io.OutputStream
 import java.net.Socket
 
-class ConnectionManager(val socket: Socket): Closeable {
+class ConnectionManager(val socket: Socket) : Closeable {
     private val input: BufferedReader = socket.getInputStream().bufferedReader()
     private val output: OutputStream = socket.getOutputStream()
 
