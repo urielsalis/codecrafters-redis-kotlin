@@ -6,6 +6,7 @@ import com.urielsalis.codecrafters.redis.resp.ErrorRespMessage
 import com.urielsalis.codecrafters.redis.resp.NullRespMessage
 import com.urielsalis.codecrafters.redis.resp.SimpleStringRespMessage
 import java.net.Socket
+import java.time.Instant
 
 class Client(private val server: Server, clientSocket: Socket) {
     private val connectionManager = ConnectionManager(clientSocket)
@@ -29,14 +30,27 @@ class Client(private val server: Server, clientSocket: Socket) {
                 "ping" -> {
                     connectionManager.sendMessage(SimpleStringRespMessage("PONG"))
                 }
+
                 "echo" -> {
                     connectionManager.sendMessage(SimpleStringRespMessage(commandArgs.joinToString(" ")))
                 }
+
                 "set" -> {
-                    if (commandArgs.size != 2) {
+                    if (commandArgs.size < 2) {
                         connectionManager.sendMessage(ErrorRespMessage("Wrong number of arguments for 'set' command"))
                     } else {
-                        server.set(commandArgs[0], BulkStringRespMessage(commandArgs[1]))
+                        val expiry = if (commandArgs.size > 2) {
+                            if (commandArgs[2].lowercase() == "ex") {
+                                Instant.now().plusSeconds(commandArgs[3].toLong())
+                            } else if (commandArgs[2].lowercase() == "px") {
+                                Instant.now().plusMillis(commandArgs[3].toLong())
+                            } else {
+                                throw IllegalArgumentException("Invalid expiration " + commandArgs.joinToString { " " })
+                            }
+                        } else {
+                            Instant.MAX
+                        }
+                        server.set(commandArgs[0], BulkStringRespMessage(commandArgs[1]), expiry)
                         connectionManager.sendMessage(SimpleStringRespMessage("OK"))
                     }
                 }
