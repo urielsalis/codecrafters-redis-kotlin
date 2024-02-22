@@ -17,8 +17,8 @@ class RedisServer : CliktCommand() {
 
         val storage = InMemoryStorage()
 
-        val serverManager = Server(serverSocket, storage)
-        thread { serverManager.acceptConnectionsLoop() }
+        val server = MasterServer(serverSocket, storage)
+        thread { server.acceptConnectionsLoop() }
     }
 }
 
