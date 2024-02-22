@@ -9,7 +9,7 @@ import java.net.ServerSocket
 import java.net.Socket
 
 class ReplicaServer(
-    serverSocket: ServerSocket, storage: Storage, masterHost: String, masterPort: Int
+    val serverSocket: ServerSocket, storage: Storage, masterHost: String, masterPort: Int
 ) : Server(serverSocket, storage, "?", -1) {
     private val client = Client(Socket(masterHost, masterPort))
     override fun getRole() = "slave"
@@ -17,6 +17,12 @@ class ReplicaServer(
         sendCommand("PING")
         val pong = client.readMessage() as SimpleStringRespMessage
         println("Answer to ping: ${pong.value}")
+        sendCommand("REPLCONF", "listening-port", serverSocket.localPort.toString())
+        val okMsg1 = client.readMessage() as SimpleStringRespMessage
+        println("Answer to REPLCONF listening-port: ${okMsg1.value}")
+        sendCommand("REPLCONF", "capa", "psync2")
+        val okMsg2 = client.readMessage() as SimpleStringRespMessage
+        println("Answer to REPLCONF capa: ${okMsg2.value}")
     }
 
     private fun sendCommand(command: String, vararg args: String) {
