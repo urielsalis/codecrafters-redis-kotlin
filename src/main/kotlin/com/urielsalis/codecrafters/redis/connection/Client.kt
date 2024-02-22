@@ -7,17 +7,22 @@ class Client(clientSocket: Socket) {
     private val connectionManager = ConnectionManager(clientSocket)
     fun handle(func: (RespMessage) -> Unit) {
         while (true) {
-            val message = connectionManager.readMessage()
-            if (message == null) {
-                connectionManager.close()
-                return
-            }
+            val message = readMessage() ?: return
             func(message)
         }
     }
 
-    fun sendMessage(simpleStringRespMessage: RespMessage) {
-        connectionManager.sendMessage(simpleStringRespMessage)
+    fun sendMessage(respMessage: RespMessage) {
+        connectionManager.sendMessage(respMessage)
+    }
+
+    fun readMessage(): RespMessage? {
+        val message = connectionManager.readMessage()
+        if (message == null) {
+            connectionManager.close()
+            return null
+        }
+        return message
     }
 
 }
