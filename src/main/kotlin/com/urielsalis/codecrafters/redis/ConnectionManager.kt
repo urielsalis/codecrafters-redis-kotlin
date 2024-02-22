@@ -1,19 +1,20 @@
 package com.urielsalis.codecrafters.redis
 
-import java.io.BufferedReader
+import com.urielsalis.codecrafters.redis.resp.RespInputStream
+import com.urielsalis.codecrafters.redis.resp.RespMessage
+import com.urielsalis.codecrafters.redis.resp.RespOutputStream
 import java.io.Closeable
-import java.io.OutputStream
 import java.net.Socket
 
 class ConnectionManager(val socket: Socket) : Closeable {
-    private val input: BufferedReader = socket.getInputStream().bufferedReader()
-    private val output: OutputStream = socket.getOutputStream()
+    private val input: RespInputStream = RespInputStream(socket.getInputStream())
+    private val output: RespOutputStream = RespOutputStream(socket.getOutputStream())
 
-    fun readMessage(): String? {
-        return input.readLine()
+    fun readMessage(): RespMessage? {
+        return input.read()
     }
 
-    fun sendMessage(message: ByteArray) {
+    fun sendMessage(message: RespMessage) {
         output.write(message)
         output.flush()
     }
