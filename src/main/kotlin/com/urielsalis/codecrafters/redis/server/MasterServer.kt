@@ -47,5 +47,6 @@ class MasterServer(serverSocket: ServerSocket, storage: Storage) :
     }
 
     override fun replicate(command: ArrayRespMessage) {
+        replicas.forEach { it.sendMessage(command) }
     }
 }
