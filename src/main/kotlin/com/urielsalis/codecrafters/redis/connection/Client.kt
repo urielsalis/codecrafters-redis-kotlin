@@ -2,13 +2,19 @@ package com.urielsalis.codecrafters.redis.connection
 
 import com.urielsalis.codecrafters.redis.resp.RespMessage
 import java.net.Socket
+import java.net.SocketException
 
 class Client(clientSocket: Socket) {
     private val connectionManager = ConnectionManager(clientSocket)
     fun handle(func: (RespMessage) -> Unit) {
         while (true) {
-            val message = readMessage() ?: return
-            func(message)
+            try {
+                val message = readMessage() ?: return
+                func(message)
+            } catch (e: SocketException) {
+                println("Connection closed!")
+                return
+            }
         }
     }
 
