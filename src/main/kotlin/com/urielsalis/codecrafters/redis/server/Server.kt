@@ -99,8 +99,18 @@ abstract class Server(
                         .let { client.sendMessage(BulkStringRespMessage(it)) }
                 }
             }
+
+            else -> {
+                handleUnknownCommand(client, commandName, commandArgs)
+            }
         }
     }
 
     abstract fun getRole(): String
+
+    abstract fun handleUnknownCommand(
+        client: Client,
+        commandName: String,
+        commandArgs: List<String>
+    )
 }

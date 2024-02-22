@@ -3,6 +3,7 @@ package com.urielsalis.codecrafters.redis.server
 import com.urielsalis.codecrafters.redis.connection.Client
 import com.urielsalis.codecrafters.redis.resp.ArrayRespMessage
 import com.urielsalis.codecrafters.redis.resp.BulkStringRespMessage
+import com.urielsalis.codecrafters.redis.resp.ErrorRespMessage
 import com.urielsalis.codecrafters.redis.resp.SimpleStringRespMessage
 import com.urielsalis.codecrafters.redis.storage.Storage
 import java.net.ServerSocket
@@ -13,6 +14,14 @@ class ReplicaServer(
 ) : Server(serverSocket, storage, "?", -1) {
     private val client = Client(Socket(masterHost, masterPort))
     override fun getRole() = "slave"
+    override fun handleUnknownCommand(
+        client: Client,
+        commandName: String,
+        commandArgs: List<String>
+    ) {
+        client.sendMessage(ErrorRespMessage("Unknown command: $commandName"))
+    }
+
     fun replicationLoop() {
         sendCommand("PING")
         val pong = client.readMessage() as SimpleStringRespMessage
