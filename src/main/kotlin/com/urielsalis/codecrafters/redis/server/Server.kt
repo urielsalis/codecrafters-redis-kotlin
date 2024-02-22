@@ -19,8 +19,8 @@ abstract class Server(
     initialReplOffset: Long
 ) {
     private val clients = mutableListOf<Client>()
-    private var replId = initialReplId
-    private var replOffset = initialReplOffset
+    var replId = initialReplId
+    var replOffset = initialReplOffset
 
     fun acceptConnectionsLoop() {
         while (true) {

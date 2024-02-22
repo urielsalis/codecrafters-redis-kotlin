@@ -23,6 +23,9 @@ class ReplicaServer(
         sendCommand("REPLCONF", "capa", "psync2")
         val okMsg2 = client.readMessage() as SimpleStringRespMessage
         println("Answer to REPLCONF capa: ${okMsg2.value}")
+        sendCommand("PSYNC", replId, replOffset.toString())
+        val psyncAnswer = client.readMessage()
+        println("Answer to PSYNC: $psyncAnswer")
     }
 
     private fun sendCommand(command: String, vararg args: String) {
