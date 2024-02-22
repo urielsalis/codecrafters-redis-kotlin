@@ -1,4 +1,4 @@
-package com.urielsalis.codecrafters.redis
+package com.urielsalis.codecrafters.redis.connection
 
 import com.urielsalis.codecrafters.redis.resp.RespMessage
 import java.net.Socket

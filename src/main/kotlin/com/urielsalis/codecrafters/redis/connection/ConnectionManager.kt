@@ -1,4 +1,4 @@
-package com.urielsalis.codecrafters.redis
+package com.urielsalis.codecrafters.redis.connection
 
 import com.urielsalis.codecrafters.redis.resp.RespInputStream
 import com.urielsalis.codecrafters.redis.resp.RespMessage

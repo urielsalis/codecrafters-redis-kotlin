@@ -1,5 +1,6 @@
-package com.urielsalis.codecrafters.redis
+package com.urielsalis.codecrafters.redis.server
 
+import com.urielsalis.codecrafters.redis.connection.Client
 import com.urielsalis.codecrafters.redis.resp.ArrayRespMessage
 import com.urielsalis.codecrafters.redis.resp.BulkStringRespMessage
 import com.urielsalis.codecrafters.redis.resp.ErrorRespMessage
@@ -11,8 +12,15 @@ import java.net.ServerSocket
 import java.time.Instant
 import kotlin.concurrent.thread
 
-abstract class Server(private val serverSocket: ServerSocket, private val storage: Storage) {
+abstract class Server(
+    private val serverSocket: ServerSocket,
+    private val storage: Storage,
+    initialReplId: String,
+    initialReplOffset: Long
+) {
     private val clients = mutableListOf<Client>()
+    private var replId = initialReplId
+    private var replOffset = initialReplOffset
 
     fun acceptConnectionsLoop() {
         while (true) {
@@ -83,7 +91,12 @@ abstract class Server(private val serverSocket: ServerSocket, private val storag
                 if (commandArgs.size != 1 || commandArgs[0] != "replication") {
                     client.sendMessage(ErrorRespMessage("Unsupported info command"))
                 } else {
-                    client.sendMessage(SimpleStringRespMessage("role:${getRole()}"))
+                    val messages = mutableMapOf<String, String>()
+                    messages["role"] = getRole()
+                    messages["master_replid"] = replId
+                    messages["master_repl_offset"] = replOffset.toString()
+                    messages.map { (key, value) -> "$key:$value" }.joinToString("\r\n")
+                        .let { client.sendMessage(BulkStringRespMessage(it)) }
                 }
             }
         }

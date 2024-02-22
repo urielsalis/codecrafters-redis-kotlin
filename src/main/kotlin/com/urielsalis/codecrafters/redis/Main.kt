@@ -5,6 +5,8 @@ import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.pair
 import com.github.ajalt.clikt.parameters.types.int
+import com.urielsalis.codecrafters.redis.server.MasterServer
+import com.urielsalis.codecrafters.redis.server.ReplicaServer
 import com.urielsalis.codecrafters.redis.storage.InMemoryStorage
 import java.net.ServerSocket
 import kotlin.concurrent.thread
