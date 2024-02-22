@@ -22,6 +22,11 @@
             <artifactId>kotlin-stdlib</artifactId>
             <version>1.9.22</version>
         </dependency>
+        <dependency>
+            <artifactId>clikt-jvm</artifactId>
+            <groupId>com.github.ajalt.clikt</groupId>
+            <version>4.2.2</version>
+        </dependency>
     </dependencies>
 
     <build>
