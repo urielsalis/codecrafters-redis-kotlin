@@ -3,7 +3,8 @@ package com.urielsalis.codecrafters.redis.resp
 import java.io.Closeable
 import java.io.InputStream
 
-class RespInputStream(val stream: InputStream) : Closeable {
+class RespInputStream(internalStream: InputStream) : Closeable {
+    private val stream = internalStream.buffered()
     fun read(): RespMessage? {
         return parse()
     }
@@ -66,8 +67,16 @@ class RespInputStream(val stream: InputStream) : Closeable {
             stream.readNBytes(2)
             return BulkStringRespMessage("")
         }
+        // We can now either have a normal bulk string, which ends with \r\n, or raw bytes, which don't.
+        // We peek at the next 2 bytes and check if they are \r\n. If they are, we return as string, if not, we return as bytes.
         val parsed = stream.readNBytes(length)
-        stream.readNBytes(2)
+        stream.mark(2)
+        val bytes = stream.readNBytes(2)
+        stream.reset()
+        if (bytes.isEmpty() || String(bytes) != "\r\n") {
+            return BulkStringBytesRespMessage(parsed)
+        }
+        stream.readNBytes(2) // re-read the \r\n
         return BulkStringRespMessage(String(parsed))
     }
 

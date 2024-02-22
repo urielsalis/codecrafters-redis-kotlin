@@ -2,10 +2,10 @@ package com.urielsalis.codecrafters.redis.server
 
 import com.urielsalis.codecrafters.redis.connection.Client
 import com.urielsalis.codecrafters.redis.resp.ArrayRespMessage
+import com.urielsalis.codecrafters.redis.resp.BulkStringBytesRespMessage
 import com.urielsalis.codecrafters.redis.resp.BulkStringRespMessage
 import com.urielsalis.codecrafters.redis.resp.ErrorRespMessage
 import com.urielsalis.codecrafters.redis.resp.NullRespMessage
-import com.urielsalis.codecrafters.redis.resp.RespMessage
 import com.urielsalis.codecrafters.redis.resp.SimpleStringRespMessage
 import com.urielsalis.codecrafters.redis.storage.Storage
 import java.net.ServerSocket
@@ -29,14 +29,17 @@ abstract class Server(
             clients.add(client)
             thread {
                 client.handle {
-                    handleCommand(client, it)
+                    if (it is ArrayRespMessage) {
+                        handleCommand(client, it)
+                    } else if (it is BulkStringBytesRespMessage) {
+                        handleRawBytes(client, it)
+                    }
                 }
             }
         }
     }
 
-    private fun handleCommand(client: Client, message: RespMessage) {
-        val command = message as ArrayRespMessage
+    private fun handleCommand(client: Client, command: ArrayRespMessage) {
         val commandName = (command.values[0] as BulkStringRespMessage).value.lowercase()
         val commandArgs = if (command.values.size == 1) {
             emptyList()
@@ -113,4 +116,6 @@ abstract class Server(
         commandName: String,
         commandArgs: List<String>
     )
+
+    abstract fun handleRawBytes(client: Client, bytes: BulkStringBytesRespMessage)
 }

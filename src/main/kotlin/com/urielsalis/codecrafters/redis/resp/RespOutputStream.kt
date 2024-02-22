@@ -41,6 +41,13 @@ class RespOutputStream(val stream: OutputStream) : Closeable {
                 writeCLRF()
             }
 
+            is BulkStringBytesRespMessage -> {
+                write("$")
+                write(message.value.size)
+                writeCLRF()
+                write(message.value)
+            }
+
             is ArrayRespMessage -> {
                 write("*")
                 write(message.values.size)

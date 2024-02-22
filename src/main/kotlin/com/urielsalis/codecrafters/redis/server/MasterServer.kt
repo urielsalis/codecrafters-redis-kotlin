@@ -1,9 +1,11 @@
 package com.urielsalis.codecrafters.redis.server
 
 import com.urielsalis.codecrafters.redis.connection.Client
+import com.urielsalis.codecrafters.redis.resp.BulkStringBytesRespMessage
 import com.urielsalis.codecrafters.redis.resp.ErrorRespMessage
 import com.urielsalis.codecrafters.redis.resp.SimpleStringRespMessage
 import com.urielsalis.codecrafters.redis.storage.Storage
+import java.io.File
 import java.net.ServerSocket
 
 class MasterServer(serverSocket: ServerSocket, storage: Storage) :
@@ -23,11 +25,16 @@ class MasterServer(serverSocket: ServerSocket, storage: Storage) :
             "psync" -> {
                 replicas.add(client)
                 client.sendMessage(SimpleStringRespMessage("FULLRESYNC $replId $replOffset"))
+                client.sendMessage(BulkStringBytesRespMessage(File("empty.rdb").readBytes()))
             }
 
             else -> {
                 client.sendMessage(ErrorRespMessage("Unknown command: $commandName"))
             }
         }
+    }
+
+    override fun handleRawBytes(client: Client, bytes: BulkStringBytesRespMessage) {
+        client.sendMessage(ErrorRespMessage("Unknown command"))
     }
 }

@@ -2,6 +2,7 @@ package com.urielsalis.codecrafters.redis.server
 
 import com.urielsalis.codecrafters.redis.connection.Client
 import com.urielsalis.codecrafters.redis.resp.ArrayRespMessage
+import com.urielsalis.codecrafters.redis.resp.BulkStringBytesRespMessage
 import com.urielsalis.codecrafters.redis.resp.BulkStringRespMessage
 import com.urielsalis.codecrafters.redis.resp.ErrorRespMessage
 import com.urielsalis.codecrafters.redis.resp.SimpleStringRespMessage
@@ -22,6 +23,10 @@ class ReplicaServer(
         client.sendMessage(ErrorRespMessage("Unknown command: $commandName"))
     }
 
+    override fun handleRawBytes(client: Client, bytes: BulkStringBytesRespMessage) {
+        // TODO handle commands from master
+    }
+
     fun replicationLoop() {
         sendCommand("PING")
         val pong = client.readMessage() as SimpleStringRespMessage
@@ -35,6 +40,11 @@ class ReplicaServer(
         sendCommand("PSYNC", replId, replOffset.toString())
         val psyncAnswer = client.readMessage()
         println("Answer to PSYNC: $psyncAnswer")
+        val firstSync = client.readMessage()
+        if (firstSync !is BulkStringBytesRespMessage) {
+            println("Expected RDB file, got $firstSync")
+        }
+        // TODO handle RDB file, for now we only receive empty ones
     }
 
     private fun sendCommand(command: String, vararg args: String) {
