@@ -30,6 +30,7 @@ abstract class Server(
             clients.add(client)
             thread {
                 client.handle {
+                    println("Message from client: $it")
                     if (it is ArrayRespMessage) {
                         handleCommand(client, it)
                     } else if (it is BulkStringBytesRespMessage) {
@@ -40,6 +41,7 @@ abstract class Server(
         }
     }
 
+    @Synchronized
     fun handleCommand(client: Client, command: ArrayRespMessage) {
         val commandName = (command.values[0] as BulkStringRespMessage).value.lowercase()
         val commandArgs = if (command.values.size == 1) {

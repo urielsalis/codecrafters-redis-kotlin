@@ -18,11 +18,27 @@ class ReplicaServer(
     private val client = Client(Socket(masterHost, masterPort))
     override fun getRole() = "slave"
     override fun handleUnknownCommand(
-        client: Client,
-        commandName: String,
-        commandArgs: List<String>
+        client: Client, commandName: String, commandArgs: List<String>
     ) {
-        client.sendMessage(ErrorRespMessage("Unknown command: $commandName"))
+        when (commandName) {
+            "replconf" -> {
+                if (commandArgs.size != 2 || commandArgs[0].lowercase() != "getack" || commandArgs[1] != "*") {
+                    client.sendMessage(
+                        ErrorRespMessage(
+                            "Invalid REPLCONF ${
+                                commandArgs.joinToString(
+                                    " "
+                                )
+                            }"
+                        )
+                    )
+                    return
+                }
+                sendCommand("REPLCONF", "ACK", replOffset.toString())
+            }
+
+            else -> client.sendMessage(ErrorRespMessage("Unknown command: $commandName"))
+        }
     }
 
     override fun handleRawBytes(client: Client, bytes: BulkStringBytesRespMessage) {
@@ -79,6 +95,8 @@ class ReplicaServer(
                 return
             }
 
+
+            println("Message from master: $message")
             if (message is ArrayRespMessage) {
                 handleCommand(client, message)
             } else if (message is BulkStringBytesRespMessage) {
