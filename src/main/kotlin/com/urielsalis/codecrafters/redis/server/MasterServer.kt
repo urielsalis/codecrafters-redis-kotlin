@@ -42,7 +42,7 @@ class MasterServer(serverSocket: ServerSocket, storage: Storage) :
     }
 
     override fun set(key: String, value: RespMessage, expiry: Instant): RespMessage {
-        storage.set(key, value, expiry)
+        super.set(key, value, expiry)
         return SimpleStringRespMessage("OK")
     }
 

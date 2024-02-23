@@ -29,6 +29,7 @@ class RedisServer : CliktCommand() {
         } else {
             val server =
                 ReplicaServer(serverSocket, storage, replicaOf!!.first, replicaOf!!.second.toInt())
+            server.initReplication()
             thread { server.replicationLoop() }
             server
         }

@@ -26,27 +26,34 @@ class ReplicaServer(
     }
 
     override fun handleRawBytes(client: Client, bytes: BulkStringBytesRespMessage) {
+        println("Received raw bytes: ${String(bytes.value)}")
         // TODO handle commands from master
     }
 
-    fun replicationLoop() {
+    fun initReplication() {
         sendCommand("PING")
-        val pong = client.readMessage() as SimpleStringRespMessage
-        println("Answer to ping: ${pong.value}")
+        client.readMessage() as SimpleStringRespMessage
         sendCommand("REPLCONF", "listening-port", serverSocket.localPort.toString())
-        val okMsg1 = client.readMessage() as SimpleStringRespMessage
-        println("Answer to REPLCONF listening-port: ${okMsg1.value}")
+        client.readMessage() as SimpleStringRespMessage
         sendCommand("REPLCONF", "capa", "psync2")
-        val okMsg2 = client.readMessage() as SimpleStringRespMessage
-        println("Answer to REPLCONF capa: ${okMsg2.value}")
+        client.readMessage() as SimpleStringRespMessage
         sendCommand("PSYNC", replId, replOffset.toString())
         val psyncAnswer = client.readMessage()
-        println("Answer to PSYNC: $psyncAnswer")
+        val psyncParts = (psyncAnswer as SimpleStringRespMessage).value.split(" ")
+        replId = psyncParts[1]
+        replOffset = psyncParts[2].toLong()
+        println("Master is now at $replId:$replOffset")
         val firstSync = client.readMessage()
         if (firstSync !is BulkStringBytesRespMessage) {
             println("Expected RDB file, got $firstSync")
+        } else {
+            handleRdbFile(firstSync)
         }
         // TODO handle RDB file, for now we only receive empty ones
+    }
+
+    private fun handleRdbFile(firstSync: BulkStringBytesRespMessage) {
+        println("Received RDB file")
     }
 
     private fun sendCommand(command: String, vararg args: String) {
@@ -55,11 +62,28 @@ class ReplicaServer(
         client.sendMessage(message)
     }
 
-    override fun set(key: String, value: RespMessage, expiry: Instant): RespMessage {
-        return ErrorRespMessage("READONLY You can't write against a read only replica.")
+    override fun set(key: String, value: RespMessage, expiry: Instant): RespMessage? {
+        super.set(key, value, expiry)
+        return null
     }
 
     override fun replicate(command: ArrayRespMessage) {
         // No need to do anything here
+    }
+
+    fun replicationLoop() {
+        while (true) {
+            val message = client.readMessage()
+            if (message == null) {
+                println("Connection closed")
+                return
+            }
+
+            if (message is ArrayRespMessage) {
+                handleCommand(client, message)
+            } else if (message is BulkStringBytesRespMessage) {
+                handleRawBytes(client, message)
+            }
+        }
     }
 }

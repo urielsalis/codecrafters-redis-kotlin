@@ -40,7 +40,7 @@ abstract class Server(
         }
     }
 
-    private fun handleCommand(client: Client, command: ArrayRespMessage) {
+    fun handleCommand(client: Client, command: ArrayRespMessage) {
         val commandName = (command.values[0] as BulkStringRespMessage).value.lowercase()
         val commandArgs = if (command.values.size == 1) {
             emptyList()
@@ -73,13 +73,10 @@ abstract class Server(
                     } else {
                         Instant.MAX
                     }
-                    client.sendMessage(
-                        set(
-                            commandArgs[0],
-                            BulkStringRespMessage(commandArgs[1]),
-                            expiry
-                        )
-                    )
+                    val message = set(commandArgs[0], BulkStringRespMessage(commandArgs[1]), expiry)
+                    if (message != null) {
+                        client.sendMessage(message)
+                    }
                     replicate(command)
                 }
             }
@@ -118,14 +115,15 @@ abstract class Server(
 
     abstract fun replicate(command: ArrayRespMessage)
 
-    abstract fun set(key: String, value: RespMessage, expiry: Instant): RespMessage
+    open fun set(key: String, value: RespMessage, expiry: Instant): RespMessage? {
+        storage.set(key, value, expiry)
+        return null
+    }
 
     abstract fun getRole(): String
 
     abstract fun handleUnknownCommand(
-        client: Client,
-        commandName: String,
-        commandArgs: List<String>
+        client: Client, commandName: String, commandArgs: List<String>
     )
 
     abstract fun handleRawBytes(client: Client, bytes: BulkStringBytesRespMessage)
