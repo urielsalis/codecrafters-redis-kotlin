@@ -19,6 +19,7 @@ class Client(clientSocket: Socket) {
     }
 
     fun sendMessage(respMessage: RespMessage) {
+        println("Sending $respMessage")
         connectionManager.sendMessage(respMessage)
     }
 

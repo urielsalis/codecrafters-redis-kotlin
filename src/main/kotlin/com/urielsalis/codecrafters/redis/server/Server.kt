@@ -52,10 +52,6 @@ abstract class Server(
         }
 
         when (commandName) {
-            "ping" -> {
-                client.sendMessage(SimpleStringRespMessage("PONG"))
-            }
-
             "echo" -> {
                 client.sendMessage(SimpleStringRespMessage(commandArgs.joinToString(" ")))
             }

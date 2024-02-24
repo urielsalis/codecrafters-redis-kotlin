@@ -6,8 +6,10 @@ import com.urielsalis.codecrafters.redis.resp.BulkStringBytesRespMessage
 import com.urielsalis.codecrafters.redis.resp.BulkStringRespMessage
 import com.urielsalis.codecrafters.redis.resp.ErrorRespMessage
 import com.urielsalis.codecrafters.redis.resp.RespMessage
+import com.urielsalis.codecrafters.redis.resp.RespOutputStream
 import com.urielsalis.codecrafters.redis.resp.SimpleStringRespMessage
 import com.urielsalis.codecrafters.redis.storage.Storage
+import java.io.ByteArrayOutputStream
 import java.net.ServerSocket
 import java.net.Socket
 import java.time.Instant
@@ -34,7 +36,12 @@ class ReplicaServer(
                     )
                     return
                 }
+                println("ACKING offset $replOffset")
                 sendCommand("REPLCONF", "ACK", replOffset.toString())
+            }
+
+            "ping" -> {
+                println("Received ping from master. Not answering due to bug in the testers")
             }
 
             else -> client.sendMessage(ErrorRespMessage("Unknown command: $commandName"))
@@ -97,11 +104,23 @@ class ReplicaServer(
 
 
             println("Message from master: $message")
+
             if (message is ArrayRespMessage) {
                 handleCommand(client, message)
+                replOffset += encodedSize(message)
             } else if (message is BulkStringBytesRespMessage) {
                 handleRawBytes(client, message)
             }
         }
+    }
+
+    private fun encodedSize(command: ArrayRespMessage): Int {
+        val output = ByteArrayOutputStream()
+        val stream = RespOutputStream(output)
+        stream.write(command)
+        stream.flush()
+        val size = output.size()
+        stream.close()
+        return size
     }
 }

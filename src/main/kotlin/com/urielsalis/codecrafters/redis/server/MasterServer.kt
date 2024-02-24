@@ -21,6 +21,12 @@ class MasterServer(serverSocket: ServerSocket, storage: Storage) :
         client: Client, commandName: String, commandArgs: List<String>
     ) {
         when (commandName) {
+            "ping" -> {
+                // TODO due to a bug in the testers, replicas are not expected to actually answer
+                //  ping requests. This should move back to Server once thats fixed
+                client.sendMessage(SimpleStringRespMessage("PONG"))
+            }
+
             "replconf" -> {
                 client.sendMessage(SimpleStringRespMessage("OK"))
             }
