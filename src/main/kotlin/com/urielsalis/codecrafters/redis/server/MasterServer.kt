@@ -39,7 +39,7 @@ class MasterServer(serverSocket: ServerSocket, storage: Storage) :
             }
 
             "wait" -> {
-                client.sendMessage(IntegerRespMessage(0))
+                client.sendMessage(IntegerRespMessage(replicas.size.toLong()))
             }
 
             else -> {
