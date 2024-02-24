@@ -4,6 +4,7 @@ import com.urielsalis.codecrafters.redis.connection.Client
 import com.urielsalis.codecrafters.redis.resp.ArrayRespMessage
 import com.urielsalis.codecrafters.redis.resp.BulkStringBytesRespMessage
 import com.urielsalis.codecrafters.redis.resp.ErrorRespMessage
+import com.urielsalis.codecrafters.redis.resp.IntegerRespMessage
 import com.urielsalis.codecrafters.redis.resp.RespMessage
 import com.urielsalis.codecrafters.redis.resp.SimpleStringRespMessage
 import com.urielsalis.codecrafters.redis.storage.Storage
@@ -35,6 +36,10 @@ class MasterServer(serverSocket: ServerSocket, storage: Storage) :
                 client.sendMessage(SimpleStringRespMessage("FULLRESYNC $replId $replOffset"))
                 client.sendMessage(BulkStringBytesRespMessage(File("empty.rdb").readBytes()))
                 replicas.add(client)
+            }
+
+            "wait" -> {
+                client.sendMessage(IntegerRespMessage(0))
             }
 
             else -> {
