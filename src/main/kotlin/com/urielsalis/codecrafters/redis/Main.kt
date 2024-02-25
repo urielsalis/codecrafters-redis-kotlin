@@ -8,6 +8,7 @@ import com.github.ajalt.clikt.parameters.types.int
 import com.urielsalis.codecrafters.redis.server.MasterServer
 import com.urielsalis.codecrafters.redis.server.ReplicaServer
 import com.urielsalis.codecrafters.redis.storage.InMemoryStorage
+import com.urielsalis.codecrafters.redis.storage.RDBStorage
 import java.net.ServerSocket
 import kotlin.concurrent.thread
 
@@ -17,12 +18,18 @@ class RedisServer : CliktCommand() {
     private val replicaOf: Pair<String, String>? by option(
         "--replicaof", help = "Replicate to another server"
     ).pair()
+    private val dir by option("--dir", help = "Directory of RDB")
+    private val dbFileName by option("--dbfilename", help = "RDB file name")
 
     override fun run() {
         val serverSocket = ServerSocket(port)
         serverSocket.setReuseAddress(true)
 
-        val storage = InMemoryStorage()
+        val storage = if (dir != null && dbFileName != null) {
+            RDBStorage(dir!!, dbFileName!!)
+        } else {
+            InMemoryStorage()
+        }
 
         val server = if (replicaOf == null) {
             MasterServer(serverSocket, storage)

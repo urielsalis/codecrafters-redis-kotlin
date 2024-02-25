@@ -81,6 +81,19 @@ abstract class Server(
                 }
             }
 
+            "config" -> {
+                if (commandArgs.size != 2 || commandArgs[0].lowercase() != "get") {
+                    client.sendMessage(ErrorRespMessage("Unsupported config command"))
+                } else {
+                    val value = storage.getConfig(commandArgs[1])
+                    if (value == null) {
+                        client.sendMessage(NullRespMessage)
+                    } else {
+                        client.sendMessage(value)
+                    }
+                }
+            }
+
             else -> handleUnknownCommand(client, commandName, commandArgs)
         }
     }

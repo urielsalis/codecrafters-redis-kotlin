@@ -1,5 +1,6 @@
 package com.urielsalis.codecrafters.redis.storage
 
+import com.urielsalis.codecrafters.redis.resp.ArrayRespMessage
 import com.urielsalis.codecrafters.redis.resp.RespMessage
 import java.time.Instant
 
@@ -20,6 +21,10 @@ class InMemoryStorage : Storage {
             }
             return pair.second
         }
+    }
+
+    override fun getConfig(key: String): ArrayRespMessage? {
+        return null
     }
 
 }
