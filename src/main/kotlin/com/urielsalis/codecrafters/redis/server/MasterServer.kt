@@ -5,41 +5,82 @@ import com.urielsalis.codecrafters.redis.resp.ArrayRespMessage
 import com.urielsalis.codecrafters.redis.resp.BulkStringBytesRespMessage
 import com.urielsalis.codecrafters.redis.resp.ErrorRespMessage
 import com.urielsalis.codecrafters.redis.resp.IntegerRespMessage
-import com.urielsalis.codecrafters.redis.resp.RespMessage
 import com.urielsalis.codecrafters.redis.resp.SimpleStringRespMessage
 import com.urielsalis.codecrafters.redis.storage.Storage
 import java.io.File
 import java.net.ServerSocket
 import java.time.Instant
+import kotlin.concurrent.thread
 
 class MasterServer(serverSocket: ServerSocket, storage: Storage) :
     Server(serverSocket, storage, "8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb", 0) {
 
-    val replicas = mutableListOf<Client>()
-
+    private val replicas = mutableMapOf<Client, Long>()
     override fun getRole() = "master"
     override fun handleUnknownCommand(
         client: Client, commandName: String, commandArgs: List<String>
     ) {
         when (commandName) {
-            "ping" -> {
-                // TODO due to a bug in the testers, replicas are not expected to actually answer
-                //  ping requests. This should move back to Server once thats fixed
-                client.sendMessage(SimpleStringRespMessage("PONG"))
-            }
-
             "replconf" -> {
-                client.sendMessage(SimpleStringRespMessage("OK"))
+                if (commandArgs.size == 2 && commandArgs[0].lowercase() == "ack") {
+                    println("Setting ack of $client to ${commandArgs[1]} at ${Instant.now()}")
+                    synchronized(replicas) {
+                        replicas[client] = commandArgs[1].toLong()
+                    }
+                } else {
+                    client.sendMessage(SimpleStringRespMessage("OK"))
+                }
             }
 
             "psync" -> {
                 client.sendMessage(SimpleStringRespMessage("FULLRESYNC $replId $replOffset"))
                 client.sendMessage(BulkStringBytesRespMessage(File("empty.rdb").readBytes()))
-                replicas.add(client)
+                synchronized(replicas) {
+                    replicas[client] = 0
+                }
             }
 
             "wait" -> {
-                client.sendMessage(IntegerRespMessage(replicas.size.toLong()))
+                val expectedReplicas = commandArgs[0].toInt()
+                val timeout = commandArgs[1].toLong()
+                val currentOffset = replOffset
+                val lock = Any()
+                var ackedPreviousCommand = 0L
+
+                if (currentOffset == 0L) {
+                    client.sendMessage(IntegerRespMessage(replicas.size.toLong()))
+                    return
+                }
+
+                var runThreads = true
+                replicas.map { (replica, previousOffset) ->
+                    thread {
+                        while (runThreads && ackedPreviousCommand < expectedReplicas) {
+                            val command = getCommand("REPLCONF", "GETACK", "*")
+                            replica.sendMessage(command)
+                            replOffset += encodedSize(command)
+                            while (runThreads && replicas[replica] == previousOffset) {
+                                Thread.yield()
+                            }
+                            val newOffset = replicas[replica]!!
+                            if (newOffset >= currentOffset) {
+                                println("Replica $replica has offset $newOffset")
+                                synchronized(lock) {
+                                    ackedPreviousCommand++
+                                }
+                                break
+                            } else {
+                                println("Replica $replica is behind with offset $newOffset, waiting for $currentOffset")
+                            }
+                        }
+                    }
+                }
+                val timeoutTime = Instant.now().plusMillis(timeout)
+                while (timeoutTime.isAfter(Instant.now()) && ackedPreviousCommand < expectedReplicas) {
+                    Thread.sleep(100)
+                }
+                runThreads = false
+                client.sendMessage(IntegerRespMessage(ackedPreviousCommand))
             }
 
             else -> {
@@ -48,16 +89,9 @@ class MasterServer(serverSocket: ServerSocket, storage: Storage) :
         }
     }
 
-    override fun handleRawBytes(client: Client, bytes: BulkStringBytesRespMessage) {
-        client.sendMessage(ErrorRespMessage("Unknown command"))
-    }
-
-    override fun set(key: String, value: RespMessage, expiry: Instant): RespMessage {
-        super.set(key, value, expiry)
-        return SimpleStringRespMessage("OK")
-    }
-
-    override fun replicate(command: ArrayRespMessage) {
-        replicas.forEach { it.sendMessage(command) }
+    override fun handleWriteCommand(client: Client, command: ArrayRespMessage) {
+        replOffset += encodedSize(command)
+        replicas.forEach { it.key.sendMessage(command) }
+        client.sendMessage(SimpleStringRespMessage("OK"))
     }
 }

@@ -2,13 +2,13 @@ package com.urielsalis.codecrafters.redis.server
 
 import com.urielsalis.codecrafters.redis.connection.Client
 import com.urielsalis.codecrafters.redis.resp.ArrayRespMessage
-import com.urielsalis.codecrafters.redis.resp.BulkStringBytesRespMessage
 import com.urielsalis.codecrafters.redis.resp.BulkStringRespMessage
 import com.urielsalis.codecrafters.redis.resp.ErrorRespMessage
 import com.urielsalis.codecrafters.redis.resp.NullRespMessage
-import com.urielsalis.codecrafters.redis.resp.RespMessage
+import com.urielsalis.codecrafters.redis.resp.RespOutputStream
 import com.urielsalis.codecrafters.redis.resp.SimpleStringRespMessage
 import com.urielsalis.codecrafters.redis.storage.Storage
+import java.io.ByteArrayOutputStream
 import java.net.ServerSocket
 import java.time.Instant
 import kotlin.concurrent.thread
@@ -30,52 +30,28 @@ abstract class Server(
             clients.add(client)
             thread {
                 client.handle {
-                    println("Message from client: $it")
                     if (it is ArrayRespMessage) {
                         handleCommand(client, it)
-                    } else if (it is BulkStringBytesRespMessage) {
-                        handleRawBytes(client, it)
+                    } else {
+                        println("Unknown message type: $it")
                     }
                 }
             }
         }
     }
 
-    @Synchronized
     fun handleCommand(client: Client, command: ArrayRespMessage) {
-        val commandName = (command.values[0] as BulkStringRespMessage).value.lowercase()
-        val commandArgs = if (command.values.size == 1) {
-            emptyList()
-        } else {
-            command.values.subList(1, command.values.size)
-                .map { (it as BulkStringRespMessage).value }
-        }
+        val (commandName, commandArgs) = parseCommand(command)
 
         when (commandName) {
-            "echo" -> {
-                client.sendMessage(SimpleStringRespMessage(commandArgs.joinToString(" ")))
-            }
-
+            "ping" -> client.sendMessage(SimpleStringRespMessage("PONG"))
+            "echo" -> client.sendMessage(SimpleStringRespMessage(commandArgs.joinToString(" ")))
             "set" -> {
                 if (commandArgs.size < 2) {
                     client.sendMessage(ErrorRespMessage("Wrong number of arguments for 'set' command"))
                 } else {
-                    val expiry = if (commandArgs.size > 2) {
-                        if (commandArgs[2].lowercase() == "ex") {
-                            Instant.now().plusSeconds(commandArgs[3].toLong())
-                        } else if (commandArgs[2].lowercase() == "px") {
-                            Instant.now().plusMillis(commandArgs[3].toLong())
-                        } else {
-                            throw IllegalArgumentException("Invalid expiration " + commandArgs.joinToString { " " })
-                        }
-                    } else {
-                        Instant.MAX
-                    }
-                    val message = set(commandArgs[0], BulkStringRespMessage(commandArgs[1]), expiry)
-                    if (message != null) {
-                        client.sendMessage(message)
-                    }
-                    replicate(command)
+                    handleSet(commandArgs)
+                    handleWriteCommand(client, command)
                 }
             }
 
@@ -105,17 +81,35 @@ abstract class Server(
                 }
             }
 
-            else -> {
-                handleUnknownCommand(client, commandName, commandArgs)
-            }
+            else -> handleUnknownCommand(client, commandName, commandArgs)
         }
     }
 
-    abstract fun replicate(command: ArrayRespMessage)
+    protected fun parseCommand(command: ArrayRespMessage): Pair<String, List<String>> {
+        val commandName = (command.values[0] as BulkStringRespMessage).value.lowercase()
+        val commandArgs = if (command.values.size == 1) {
+            emptyList()
+        } else {
+            command.values.subList(1, command.values.size)
+                .map { (it as BulkStringRespMessage).value }
+        }
+        return Pair(commandName, commandArgs)
+    }
 
-    open fun set(key: String, value: RespMessage, expiry: Instant): RespMessage? {
-        storage.set(key, value, expiry)
-        return null
+    abstract fun handleWriteCommand(client: Client, command: ArrayRespMessage)
+    protected fun handleSet(commandArgs: List<String>) {
+        val expiry = if (commandArgs.size > 2) {
+            if (commandArgs[2].lowercase() == "ex") {
+                Instant.now().plusSeconds(commandArgs[3].toLong())
+            } else if (commandArgs[2].lowercase() == "px") {
+                Instant.now().plusMillis(commandArgs[3].toLong())
+            } else {
+                throw IllegalArgumentException("Invalid expiration " + commandArgs.joinToString { " " })
+            }
+        } else {
+            Instant.MAX
+        }
+        storage.set(commandArgs[0], BulkStringRespMessage(commandArgs[1]), expiry)
     }
 
     abstract fun getRole(): String
@@ -124,5 +118,19 @@ abstract class Server(
         client: Client, commandName: String, commandArgs: List<String>
     )
 
-    abstract fun handleRawBytes(client: Client, bytes: BulkStringBytesRespMessage)
+    protected fun encodedSize(command: ArrayRespMessage): Int {
+        val output = ByteArrayOutputStream()
+        val stream = RespOutputStream(output)
+        stream.write(command)
+        stream.flush()
+        val size = output.size()
+        stream.close()
+        return size
+    }
+
+    protected fun getCommand(command: String, vararg args: String): ArrayRespMessage {
+        val argsResp = args.map { BulkStringRespMessage(it) }.toTypedArray()
+        return ArrayRespMessage(listOf(BulkStringRespMessage(command), *argsResp))
+    }
+
 }

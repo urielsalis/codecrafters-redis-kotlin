@@ -3,25 +3,25 @@ package com.urielsalis.codecrafters.redis.server
 import com.urielsalis.codecrafters.redis.connection.Client
 import com.urielsalis.codecrafters.redis.resp.ArrayRespMessage
 import com.urielsalis.codecrafters.redis.resp.BulkStringBytesRespMessage
-import com.urielsalis.codecrafters.redis.resp.BulkStringRespMessage
 import com.urielsalis.codecrafters.redis.resp.ErrorRespMessage
-import com.urielsalis.codecrafters.redis.resp.RespMessage
-import com.urielsalis.codecrafters.redis.resp.RespOutputStream
 import com.urielsalis.codecrafters.redis.resp.SimpleStringRespMessage
 import com.urielsalis.codecrafters.redis.storage.Storage
-import java.io.ByteArrayOutputStream
 import java.net.ServerSocket
 import java.net.Socket
-import java.time.Instant
 
 class ReplicaServer(
     val serverSocket: ServerSocket, storage: Storage, masterHost: String, masterPort: Int
 ) : Server(serverSocket, storage, "?", -1) {
     private val client = Client(Socket(masterHost, masterPort))
     override fun getRole() = "slave"
+
     override fun handleUnknownCommand(
         client: Client, commandName: String, commandArgs: List<String>
     ) {
+        client.sendMessage(ErrorRespMessage("Unknown command: $commandName"))
+    }
+
+    fun handleMasterCommand(commandName: String, commandArgs: List<String>) {
         when (commandName) {
             "replconf" -> {
                 if (commandArgs.size != 2 || commandArgs[0].lowercase() != "getack" || commandArgs[1] != "*") {
@@ -36,31 +36,30 @@ class ReplicaServer(
                     )
                     return
                 }
-                println("ACKING offset $replOffset")
-                sendCommand("REPLCONF", "ACK", replOffset.toString())
+                println("Returning REPLCONF ACK $replOffset")
+                client.sendMessage(getCommand("REPLCONF", "ACK", replOffset.toString()))
             }
 
-            "ping" -> {
-                println("Received ping from master. Not answering due to bug in the testers")
-            }
+            "set" -> handleSet(commandArgs)
+
+            "ping" -> println("Received ping from master")
 
             else -> client.sendMessage(ErrorRespMessage("Unknown command: $commandName"))
         }
     }
 
-    override fun handleRawBytes(client: Client, bytes: BulkStringBytesRespMessage) {
-        println("Received raw bytes: ${String(bytes.value)}")
-        // TODO handle commands from master
-    }
-
     fun initReplication() {
-        sendCommand("PING")
+        client.sendMessage(getCommand("PING"))
         client.readMessage() as SimpleStringRespMessage
-        sendCommand("REPLCONF", "listening-port", serverSocket.localPort.toString())
+        client.sendMessage(
+            getCommand(
+                "REPLCONF", "listening-port", serverSocket.localPort.toString()
+            )
+        )
         client.readMessage() as SimpleStringRespMessage
-        sendCommand("REPLCONF", "capa", "psync2")
+        client.sendMessage(getCommand("REPLCONF", "capa", "psync2"))
         client.readMessage() as SimpleStringRespMessage
-        sendCommand("PSYNC", replId, replOffset.toString())
+        client.sendMessage(getCommand("PSYNC", replId, replOffset.toString()))
         val psyncAnswer = client.readMessage()
         val psyncParts = (psyncAnswer as SimpleStringRespMessage).value.split(" ")
         replId = psyncParts[1]
@@ -79,20 +78,10 @@ class ReplicaServer(
         println("Received RDB file")
     }
 
-    private fun sendCommand(command: String, vararg args: String) {
-        val argsResp = args.map { BulkStringRespMessage(it) }.toTypedArray()
-        val message = ArrayRespMessage(listOf(BulkStringRespMessage(command), *argsResp))
-        client.sendMessage(message)
+    override fun handleWriteCommand(client: Client, command: ArrayRespMessage) {
+        println("Write commands are not allowed on replicas, should never happen")
     }
 
-    override fun set(key: String, value: RespMessage, expiry: Instant): RespMessage? {
-        super.set(key, value, expiry)
-        return null
-    }
-
-    override fun replicate(command: ArrayRespMessage) {
-        // No need to do anything here
-    }
 
     fun replicationLoop() {
         while (true) {
@@ -102,25 +91,14 @@ class ReplicaServer(
                 return
             }
 
-
-            println("Message from master: $message")
-
             if (message is ArrayRespMessage) {
-                handleCommand(client, message)
+                val (commandName, commandArgs) = parseCommand(message)
+                handleMasterCommand(commandName, commandArgs)
                 replOffset += encodedSize(message)
-            } else if (message is BulkStringBytesRespMessage) {
-                handleRawBytes(client, message)
+            } else {
+                println("Unknown message type: $message")
             }
         }
     }
 
-    private fun encodedSize(command: ArrayRespMessage): Int {
-        val output = ByteArrayOutputStream()
-        val stream = RespOutputStream(output)
-        stream.write(command)
-        stream.flush()
-        val size = output.size()
-        stream.close()
-        return size
-    }
 }

@@ -5,11 +5,8 @@ import java.io.InputStream
 
 class RespInputStream(internalStream: InputStream) : Closeable {
     private val stream = internalStream.buffered()
-    fun read(): RespMessage? {
-        return parse()
-    }
 
-    fun parse(): RespMessage? {
+    fun read(): RespMessage? {
         val bytes = stream.readNBytes(1)
         if (bytes.isEmpty()) {
             return null
@@ -21,7 +18,7 @@ class RespInputStream(internalStream: InputStream) : Closeable {
             ':' -> parseInteger()
             '$' -> parseBulkString()
             '*' -> parseArray()
-            else -> throw Exception("Invalid RESP message")
+            else -> throw Exception("Invalid RESP message header: $header")
         }
     }
 
@@ -84,7 +81,7 @@ class RespInputStream(internalStream: InputStream) : Closeable {
         val length = readUntilNewLine().toUInt()
         val values = mutableListOf<RespMessage>()
         for (i in 0u until length) {
-            values.add(parse()!!)
+            values.add(read()!!)
         }
         return ArrayRespMessage(values)
     }

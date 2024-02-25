@@ -32,7 +32,7 @@ class RedisServer : CliktCommand() {
             server.initReplication()
             thread { server.replicationLoop() }
             // TODO due to a bug in the tester https://github.com/codecrafters-io/build-your-own-redis/issues/132 we need to wait for the replica to receive all SETs
-            Thread.sleep(1000)
+            Thread.sleep(100)
             server
         }
         thread { server.acceptConnectionsLoop() }
