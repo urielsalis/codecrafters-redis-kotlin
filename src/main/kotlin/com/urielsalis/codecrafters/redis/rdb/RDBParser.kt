@@ -4,6 +4,7 @@ import com.urielsalis.codecrafters.redis.resp.BulkStringRespMessage
 import com.urielsalis.codecrafters.redis.resp.RespMessage
 import java.io.InputStream
 import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import java.time.Instant
 
 fun parseRDB(input: ByteArray): Map<String, Pair<Instant, RespMessage>> {
@@ -33,27 +34,32 @@ fun parseRDB(input: ByteArray): Map<String, Pair<Instant, RespMessage>> {
                 println("Resize DB to $hashTableSize, $expireHashTableSize")
             }
 
-            0xFC -> {
-                TODO("Expiry")
-            }
-
-            0xFD -> {
-                TODO("Expiry")
-            }
-
             else -> break
         }
         type = inputStream.read()
     }
-    // Got to keys, type contains the key type
+    var expiry = Instant.MAX
+    // Got to keys, type contains the key type or expiry type
     val keys = mutableMapOf<String, Pair<Instant, RespMessage>>()
     while (type != 0xFF) {
+        if (type == 0xFD) {
+            val seconds = Integer.toUnsignedLong(inputStream.readNBytes(4).toInt())
+            println("Seconds: $seconds")
+            expiry = Instant.ofEpochSecond(seconds)
+            type = inputStream.read()
+        } else if (type == 0xFC) {
+            val milliseconds = inputStream.readNBytes(8).toLong()
+            println("Milliseconds: $milliseconds")
+            expiry = Instant.ofEpochMilli(milliseconds)
+            type = inputStream.read()
+        }
         val key = readStringEncoded(inputStream)
         val value = when (type) {
             0 -> readStringEncoded(inputStream)
             else -> throw Exception("Invalid encoding type: $type")
         }
-        keys[key] = Instant.MAX to BulkStringRespMessage(value)
+        println("Read key: $key, value: $value, expiry: $expiry")
+        keys[key] = expiry to BulkStringRespMessage(value)
         type = inputStream.read()
     }
     return keys
@@ -80,8 +86,7 @@ private fun readLengthEncoded(inputStream: InputStream): Int {
         return ((firstValue.toInt() shl 8) or (secondValue.toInt() and 0xFF)).toShort().toInt()
     }
     if (masked == 2u) {
-        val bytes = inputStream.readNBytes(4)
-        return ByteBuffer.wrap(bytes).getInt()
+        return inputStream.readNBytes(4).toInt()
     }
     if (masked == 3u) {
         // Special cases are unsupported, we read the data and return 0
@@ -107,5 +112,13 @@ private fun readLengthEncoded(inputStream: InputStream): Int {
         }
     }
     throw UnsupportedOperationException("Dont know how to read special legnth encodings")
+}
+
+private fun ByteArray.toInt(): Int {
+    return ByteBuffer.wrap(this).order(ByteOrder.LITTLE_ENDIAN).getInt()
+}
+
+private fun ByteArray.toLong(): Long {
+    return ByteBuffer.wrap(this).order(ByteOrder.LITTLE_ENDIAN).getLong()
 }
 
