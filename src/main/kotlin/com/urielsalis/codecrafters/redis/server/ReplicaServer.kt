@@ -5,6 +5,7 @@ import com.urielsalis.codecrafters.redis.resp.ArrayRespMessage
 import com.urielsalis.codecrafters.redis.resp.BulkStringBytesRespMessage
 import com.urielsalis.codecrafters.redis.resp.ErrorRespMessage
 import com.urielsalis.codecrafters.redis.resp.SimpleStringRespMessage
+import com.urielsalis.codecrafters.redis.storage.RDBStorage
 import com.urielsalis.codecrafters.redis.storage.Storage
 import java.net.ServerSocket
 import java.net.Socket
@@ -76,6 +77,7 @@ class ReplicaServer(
 
     private fun handleRdbFile(firstSync: BulkStringBytesRespMessage) {
         println("Received RDB file")
+        storage = RDBStorage(bytes = firstSync.value)
     }
 
     override fun handleWriteCommand(client: Client, command: ArrayRespMessage) {

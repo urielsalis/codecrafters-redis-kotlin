@@ -15,7 +15,7 @@ import kotlin.concurrent.thread
 
 abstract class Server(
     private val serverSocket: ServerSocket,
-    protected val storage: Storage,
+    protected var storage: Storage,
     initialReplId: String,
     initialReplOffset: Long
 ) {
@@ -91,6 +91,15 @@ abstract class Server(
                     } else {
                         client.sendMessage(value)
                     }
+                }
+            }
+
+            "keys" -> {
+                if (commandArgs.size != 1) {
+                    client.sendMessage(ErrorRespMessage("Wrong number of arguments for 'keys' command"))
+                } else {
+                    val keys = storage.getKeys(commandArgs[0])
+                    client.sendMessage(keys)
                 }
             }
 

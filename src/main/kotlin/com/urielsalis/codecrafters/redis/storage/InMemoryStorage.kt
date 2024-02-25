@@ -1,11 +1,12 @@
 package com.urielsalis.codecrafters.redis.storage
 
 import com.urielsalis.codecrafters.redis.resp.ArrayRespMessage
+import com.urielsalis.codecrafters.redis.resp.BulkStringRespMessage
 import com.urielsalis.codecrafters.redis.resp.RespMessage
 import java.time.Instant
 
 class InMemoryStorage : Storage {
-    val map = mutableMapOf<String, Pair<Instant, RespMessage>>()
+    private val map = mutableMapOf<String, Pair<Instant, RespMessage>>()
     override fun set(key: String, value: RespMessage, expiry: Instant) {
         synchronized(map) {
             map[key] = expiry to value
@@ -25,6 +26,15 @@ class InMemoryStorage : Storage {
 
     override fun getConfig(key: String): ArrayRespMessage? {
         return null
+    }
+
+    override fun getKeys(pattern: String): ArrayRespMessage {
+        val keys = if (pattern == "*") {
+            map.keys
+        } else {
+            map.keys.filter { it.matches(pattern.toRegex()) }
+        }
+        return ArrayRespMessage(keys.map { BulkStringRespMessage(it) })
     }
 
 }
