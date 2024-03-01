@@ -54,6 +54,10 @@ class RespOutputStream(val stream: OutputStream) : Closeable {
                 writeCLRF()
                 message.values.forEach { write(it) }
             }
+
+            is StreamRespMessage -> {
+                println("Tried to serialize a StreamRespMessage $message, ignoring")
+            }
         }
     }
 

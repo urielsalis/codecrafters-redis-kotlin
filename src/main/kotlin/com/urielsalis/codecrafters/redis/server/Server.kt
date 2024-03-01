@@ -112,6 +112,21 @@ abstract class Server(
                 }
             }
 
+            "xadd" -> {
+                if (commandArgs.isEmpty()) {
+                    client.sendMessage(ErrorRespMessage("Wrong number of arguments for 'xadd' command"))
+                } else {
+                    val streamKey = commandArgs[0]
+                    val arguments =
+                        commandArgs.subList(1, commandArgs.size - 1).chunked(2)
+                            .associate { it[0] to it[1] }
+
+                    val id = storage.xadd(streamKey, arguments)
+                    client.sendMessage(BulkStringRespMessage(id))
+                }
+
+            }
+
             else -> handleUnknownCommand(client, commandName, commandArgs)
         }
     }

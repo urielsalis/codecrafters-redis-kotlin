@@ -3,9 +3,10 @@ package com.urielsalis.codecrafters.redis.storage
 import com.urielsalis.codecrafters.redis.resp.ArrayRespMessage
 import com.urielsalis.codecrafters.redis.resp.BulkStringRespMessage
 import com.urielsalis.codecrafters.redis.resp.RespMessage
+import com.urielsalis.codecrafters.redis.resp.StreamRespMessage
 import java.time.Instant
 
-class InMemoryStorage : Storage {
+open class InMemoryStorage : Storage {
     private val map = mutableMapOf<String, Pair<Instant, RespMessage>>()
     override fun set(key: String, value: RespMessage, expiry: Instant) {
         synchronized(map) {
@@ -41,9 +42,16 @@ class InMemoryStorage : Storage {
         return when (val value = get(key)) {
             is BulkStringRespMessage -> "string"
             is ArrayRespMessage -> "list"
+            is StreamRespMessage -> "stream"
             null -> "none"
             else -> throw IllegalArgumentException("Unsupported type " + value::class.simpleName)
         }
+    }
+
+    override fun xadd(streamKey: String, arguments: Map<String, String>): String {
+        val stream = StreamRespMessage(streamKey, arguments)
+        set(streamKey, stream, Instant.MAX)
+        return streamKey
     }
 
 }
