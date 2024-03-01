@@ -70,7 +70,7 @@ open class InMemoryStorage : Storage {
         if (stream !is StreamRespMessage) {
             return ErrorRespMessage("WRONGTYPE Operation against a key holding the wrong kind of value")
         }
-        val minId = if (start == null) {
+        val minId = if (start == null || start == "-") {
             StreamEntryId(0, 0)
         } else {
             val parts = start.split("-")
