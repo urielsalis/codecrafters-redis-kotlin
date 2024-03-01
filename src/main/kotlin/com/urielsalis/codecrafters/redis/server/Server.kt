@@ -137,6 +137,17 @@ abstract class Server(
                 }
             }
 
+            "xread" -> {
+                if (commandArgs.size < 3) {
+                    client.sendMessage(ErrorRespMessage("Wrong number of arguments for 'xread' command"))
+                } else {
+                    val streamKey = commandArgs[1]
+                    val minId = commandArgs[2]
+                    val message = storage.xread(streamKey, minId)
+                    client.sendMessage(message)
+                }
+            }
+
             else -> handleUnknownCommand(client, commandName, commandArgs)
         }
     }

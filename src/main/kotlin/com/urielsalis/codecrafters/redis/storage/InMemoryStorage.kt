@@ -88,8 +88,7 @@ open class InMemoryStorage : Storage {
             }
             StreamEntryId(parts[0].toLong(), parts[1].toLong())
         }
-        val entries = stream.values
-            .filter { it.id.ms >= minId.ms && it.id.seq >= minId.seq }
+        val entries = stream.values.filter { it.id.ms >= minId.ms && it.id.seq >= minId.seq }
             .filter { it.id.ms <= maxId.ms && it.id.seq <= maxId.seq }
         return ArrayRespMessage(entries.map {
             ArrayRespMessage(
@@ -103,6 +102,44 @@ open class InMemoryStorage : Storage {
                 )
             )
         })
+    }
+
+    override fun xread(streamKey: String, minId: String): RespMessage {
+        val stream = get(streamKey) ?: return ArrayRespMessage(emptyList())
+        if (stream !is StreamRespMessage) {
+            return ErrorRespMessage("WRONGTYPE Operation against a key holding the wrong kind of value")
+        }
+        val minId = if (minId == "-") {
+            StreamEntryId(0, 0)
+        } else {
+            val parts = minId.split("-")
+            if (parts.size != 2) {
+                StreamEntryId(minId.toLong(), 1)
+            }
+            StreamEntryId(parts[0].toLong(), parts[1].toLong() + 1)
+        }
+        val entries = stream.values.filter { it.id.ms >= minId.ms && it.id.seq >= minId.seq }
+        return ArrayRespMessage(
+            listOf(
+                ArrayRespMessage(
+                    listOf(
+                        BulkStringRespMessage(streamKey),
+                        ArrayRespMessage(entries.map {
+                            ArrayRespMessage(
+                                listOf(
+                                    BulkStringRespMessage("${it.id.ms}-${it.id.seq}"),
+                                    ArrayRespMessage(it.values.flatMap { (k, v) ->
+                                        listOf(
+                                            BulkStringRespMessage(k), BulkStringRespMessage(v)
+                                        )
+                                    })
+                                )
+                            )
+                        })
+                    )
+                )
+            )
+        )
     }
 
     private fun getEntry(
