@@ -138,6 +138,16 @@ open class InMemoryStorage : Storage {
         )
     }
 
+    override fun xmaxid(streamKey: String): StreamEntryId {
+        val stream = get(streamKey) ?: return StreamEntryId(0, 0)
+        if (stream !is StreamRespMessage) {
+            return StreamEntryId(0, 0)
+        }
+        val maxMs = stream.values.maxOf { it.id.ms }
+        val maxSeq = stream.values.filter { it.id.ms == maxMs }.maxOf { it.id.seq }
+        return StreamEntryId(maxMs, maxSeq)
+    }
+
     private fun getEntry(
         streamKey: String, entryId: String, arguments: Map<String, String>
     ): Pair<RespMessage, StreamEntryId?> {

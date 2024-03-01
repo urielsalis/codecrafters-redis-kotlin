@@ -2,6 +2,7 @@ package com.urielsalis.codecrafters.redis.storage
 
 import com.urielsalis.codecrafters.redis.resp.ArrayRespMessage
 import com.urielsalis.codecrafters.redis.resp.RespMessage
+import com.urielsalis.codecrafters.redis.resp.StreamEntryId
 import java.time.Instant
 
 interface Storage {
@@ -14,4 +15,5 @@ interface Storage {
     fun xadd(streamKey: String, entryId: String, arguments: Map<String, String>): RespMessage
     fun xrange(streamKey: String, start: String?, end: String?): RespMessage
     fun xread(streamKey: String, minId: String): RespMessage
+    fun xmaxid(streamKey: String): StreamEntryId
 }

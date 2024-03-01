@@ -120,7 +120,6 @@ abstract class Server(
                     val entryId = commandArgs[1]
                     val arguments = commandArgs.subList(2, commandArgs.size).chunked(2)
                         .associate { it[0] to it[1] }
-
                     client.sendMessage(storage.xadd(streamKey, entryId, arguments))
                 }
             }
@@ -141,6 +140,17 @@ abstract class Server(
                 if (commandArgs.size < 3) {
                     client.sendMessage(ErrorRespMessage("Wrong number of arguments for 'xread' command"))
                 } else {
+                    val blockTime = if (commandArgs.contains("block")) {
+                        val value = commandArgs[commandArgs.indexOf("block") + 1].toLong()
+                        if (value > 0) {
+                            value
+                        } else {
+                            TODO()
+                            // return max :D
+                        }
+                    } else {
+                        -1L
+                    }
                     val start = commandArgs.indexOf("streams")
                     if (start == -1) {
                         client.sendMessage(ErrorRespMessage("Invalid arguments for 'xread' command"))
@@ -151,10 +161,47 @@ abstract class Server(
                             streamsAndKeys.subList(streamsAndKeys.size / 2, streamsAndKeys.size)
                         val streamToKeys = streams.zip(keys)
 
-                        val message = ArrayRespMessage(streamToKeys.map { (stream, key) ->
-                            storage.xread(stream, key)
-                        })
-                        client.sendMessage(message)
+                        if (blockTime == -1L) {
+                            val message = ArrayRespMessage(streamToKeys.map { (stream, key) ->
+                                storage.xread(stream, key)
+                            })
+                            client.sendMessage(message)
+                        } else {
+                            val initialMaxKeys = streamToKeys.map { (stream, keys) ->
+                                stream to keys
+                            }
+                            var currentTime = Instant.now().toEpochMilli()
+                            val maxTime = currentTime + blockTime
+                            var sent = false
+                            while (currentTime <= maxTime) {
+                                val message = ArrayRespMessage(initialMaxKeys.map { (stream, key) ->
+                                    storage.xread(stream, key)
+                                })
+                                if (message.values.all {
+                                        if (it !is ArrayRespMessage) {
+                                            return@all false
+                                        }
+                                        val last = message.values.lastOrNull()
+                                        if (last !is ArrayRespMessage) {
+                                            return@all false
+                                        }
+                                        val last2 = last.values.last()
+                                        if (last2 !is ArrayRespMessage) {
+                                            return@all false
+                                        }
+                                        last2.values.isNotEmpty()
+                                    }) {
+                                    sent = true
+                                    client.sendMessage(message)
+                                    break
+                                }
+                                currentTime = Instant.now().toEpochMilli()
+                            }
+                            if (!sent) {
+                                client.sendMessage(NullRespMessage)
+                            }
+                        }
+
                     }
                 }
             }
