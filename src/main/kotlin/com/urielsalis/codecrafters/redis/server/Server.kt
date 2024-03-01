@@ -141,10 +141,21 @@ abstract class Server(
                 if (commandArgs.size < 3) {
                     client.sendMessage(ErrorRespMessage("Wrong number of arguments for 'xread' command"))
                 } else {
-                    val streamKey = commandArgs[1]
-                    val minId = commandArgs[2]
-                    val message = storage.xread(streamKey, minId)
-                    client.sendMessage(message)
+                    val start = commandArgs.indexOf("streams")
+                    if (start == -1) {
+                        client.sendMessage(ErrorRespMessage("Invalid arguments for 'xread' command"))
+                    } else {
+                        val streamsAndKeys = commandArgs.subList(start + 1, commandArgs.size)
+                        val streams = streamsAndKeys.subList(0, streamsAndKeys.size / 2)
+                        val keys =
+                            streamsAndKeys.subList(streamsAndKeys.size / 2, streamsAndKeys.size)
+                        val streamToKeys = streams.zip(keys)
+
+                        val message = ArrayRespMessage(streamToKeys.map { (stream, key) ->
+                            storage.xread(stream, key)
+                        })
+                        client.sendMessage(message)
+                    }
                 }
             }
 

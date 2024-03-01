@@ -121,23 +121,19 @@ open class InMemoryStorage : Storage {
         val entries = stream.values.filter { it.id.ms >= minId.ms && it.id.seq >= minId.seq }
         return ArrayRespMessage(
             listOf(
-                ArrayRespMessage(
-                    listOf(
-                        BulkStringRespMessage(streamKey),
-                        ArrayRespMessage(entries.map {
-                            ArrayRespMessage(
+                BulkStringRespMessage(streamKey),
+                ArrayRespMessage(entries.map {
+                    ArrayRespMessage(
+                        listOf(
+                            BulkStringRespMessage("${it.id.ms}-${it.id.seq}"),
+                            ArrayRespMessage(it.values.flatMap { (k, v) ->
                                 listOf(
-                                    BulkStringRespMessage("${it.id.ms}-${it.id.seq}"),
-                                    ArrayRespMessage(it.values.flatMap { (k, v) ->
-                                        listOf(
-                                            BulkStringRespMessage(k), BulkStringRespMessage(v)
-                                        )
-                                    })
+                                    BulkStringRespMessage(k), BulkStringRespMessage(v)
                                 )
-                            )
-                        })
+                            })
+                        )
                     )
-                )
+                })
             )
         )
     }
