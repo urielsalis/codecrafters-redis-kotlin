@@ -65,6 +65,46 @@ open class InMemoryStorage : Storage {
         }
     }
 
+    override fun xrange(streamKey: String, start: String?, end: String?): RespMessage {
+        val stream = get(streamKey) ?: return ArrayRespMessage(emptyList())
+        if (stream !is StreamRespMessage) {
+            return ErrorRespMessage("WRONGTYPE Operation against a key holding the wrong kind of value")
+        }
+        val minId = if (start == null) {
+            StreamEntryId(0, 0)
+        } else {
+            val parts = start.split("-")
+            if (parts.size != 2) {
+                StreamEntryId(start.toLong(), 0)
+            }
+            StreamEntryId(parts[0].toLong(), parts[1].toLong())
+        }
+        val maxId = if (end == null) {
+            StreamEntryId(Long.MAX_VALUE, Long.MAX_VALUE)
+        } else {
+            val parts = end.split("-")
+            if (parts.size != 2) {
+                StreamEntryId(end.toLong(), Long.MAX_VALUE)
+            }
+            StreamEntryId(parts[0].toLong(), parts[1].toLong())
+        }
+        val entries = stream.values
+            .filter { it.id.ms >= minId.ms && it.id.seq >= minId.seq }
+            .filter { it.id.ms <= maxId.ms && it.id.seq <= maxId.seq }
+        return ArrayRespMessage(entries.map {
+            ArrayRespMessage(
+                listOf(
+                    BulkStringRespMessage("${it.id.ms}-${it.id.seq}"),
+                    ArrayRespMessage(it.values.flatMap { (k, v) ->
+                        listOf(
+                            BulkStringRespMessage(k), BulkStringRespMessage(v)
+                        )
+                    })
+                )
+            )
+        })
+    }
+
     private fun getEntry(
         streamKey: String, entryId: String, arguments: Map<String, String>
     ): Pair<RespMessage, StreamEntryId?> {

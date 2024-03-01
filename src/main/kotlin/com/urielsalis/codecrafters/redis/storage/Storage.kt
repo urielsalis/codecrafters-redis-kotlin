@@ -12,4 +12,5 @@ interface Storage {
     fun getKeys(pattern: String): ArrayRespMessage
     fun getType(key: String): String
     fun xadd(streamKey: String, entryId: String, arguments: Map<String, String>): RespMessage
+    fun xrange(streamKey: String, start: String?, end: String?): RespMessage
 }

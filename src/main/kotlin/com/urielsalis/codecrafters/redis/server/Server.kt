@@ -118,13 +118,23 @@ abstract class Server(
                 } else {
                     val streamKey = commandArgs[0]
                     val entryId = commandArgs[1]
-                    val arguments =
-                        commandArgs.subList(2, commandArgs.size).chunked(2)
-                            .associate { it[0] to it[1] }
+                    val arguments = commandArgs.subList(2, commandArgs.size).chunked(2)
+                        .associate { it[0] to it[1] }
 
                     client.sendMessage(storage.xadd(streamKey, entryId, arguments))
                 }
+            }
 
+            "xrange" -> {
+                if (commandArgs.isEmpty()) {
+                    client.sendMessage(ErrorRespMessage("Wrong number of arguments for 'xrange' command"))
+                } else {
+                    val streamKey = commandArgs[0]
+                    val start = commandArgs.getOrNull(1)
+                    val end = commandArgs.getOrNull(2)
+                    val message = storage.xrange(streamKey, start, end)
+                    client.sendMessage(message)
+                }
             }
 
             else -> handleUnknownCommand(client, commandName, commandArgs)
