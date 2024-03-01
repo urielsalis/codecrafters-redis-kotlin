@@ -10,4 +10,5 @@ interface Storage {
 
     fun getConfig(key: String): ArrayRespMessage?
     fun getKeys(pattern: String): ArrayRespMessage
+    fun getType(key: String): String
 }

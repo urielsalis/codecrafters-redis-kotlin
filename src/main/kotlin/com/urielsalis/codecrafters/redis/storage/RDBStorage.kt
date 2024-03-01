@@ -53,4 +53,8 @@ class RDBStorage(
         }
         return null
     }
+
+    override fun getType(key: String): String {
+        return inMemoryStorage.getType(key)
+    }
 }

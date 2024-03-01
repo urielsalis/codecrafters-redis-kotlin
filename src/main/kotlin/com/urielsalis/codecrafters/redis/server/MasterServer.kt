@@ -53,12 +53,14 @@ class MasterServer(serverSocket: ServerSocket, storage: Storage) :
                 }
 
                 var runThreads = true
+                val command = getCommand("REPLCONF", "GETACK", "*")
+                if (replicas.isNotEmpty()) {
+                    replOffset += encodedSize(command)
+                }
                 replicas.map { (replica, previousOffset) ->
                     thread {
                         while (runThreads && ackedPreviousCommand < expectedReplicas) {
-                            val command = getCommand("REPLCONF", "GETACK", "*")
                             replica.sendMessage(command)
-                            replOffset += encodedSize(command)
                             while (runThreads && replicas[replica] == previousOffset) {
                                 Thread.yield()
                             }
@@ -71,6 +73,7 @@ class MasterServer(serverSocket: ServerSocket, storage: Storage) :
                                 break
                             } else {
                                 println("Replica $replica is behind with offset $newOffset, waiting for $currentOffset")
+                                Thread.sleep(100)
                             }
                         }
                     }
@@ -84,7 +87,7 @@ class MasterServer(serverSocket: ServerSocket, storage: Storage) :
             }
 
             else -> {
-                client.sendMessage(ErrorRespMessage("Unknown command: $commandName"))
+                client.sendMessage(ErrorRespMessage("Unknown command"))
             }
         }
     }

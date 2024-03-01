@@ -103,6 +103,15 @@ abstract class Server(
                 }
             }
 
+            "type" -> {
+                if (commandArgs.size != 1) {
+                    client.sendMessage(ErrorRespMessage("Wrong number of arguments for 'type' command"))
+                } else {
+                    val type = storage.getType(commandArgs[0])
+                    client.sendMessage(SimpleStringRespMessage(type))
+                }
+            }
+
             else -> handleUnknownCommand(client, commandName, commandArgs)
         }
     }

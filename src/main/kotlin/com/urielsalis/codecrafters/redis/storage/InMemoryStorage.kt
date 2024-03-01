@@ -37,4 +37,13 @@ class InMemoryStorage : Storage {
         return ArrayRespMessage(keys.map { BulkStringRespMessage(it) })
     }
 
+    override fun getType(key: String): String {
+        return when (val value = get(key)) {
+            is BulkStringRespMessage -> "string"
+            is ArrayRespMessage -> "list"
+            null -> "none"
+            else -> throw IllegalArgumentException("Unsupported type " + value::class.simpleName)
+        }
+    }
+
 }

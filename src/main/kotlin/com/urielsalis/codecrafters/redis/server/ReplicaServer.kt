@@ -45,7 +45,7 @@ class ReplicaServer(
 
             "ping" -> println("Received ping from master")
 
-            else -> client.sendMessage(ErrorRespMessage("Unknown command: $commandName"))
+            else -> client.sendMessage(ErrorRespMessage("Unknown command"))
         }
     }
 
