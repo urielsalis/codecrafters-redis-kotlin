@@ -113,16 +113,16 @@ abstract class Server(
             }
 
             "xadd" -> {
-                if (commandArgs.isEmpty()) {
+                if (commandArgs.size < 2) {
                     client.sendMessage(ErrorRespMessage("Wrong number of arguments for 'xadd' command"))
                 } else {
                     val streamKey = commandArgs[0]
+                    val entryId = commandArgs[1]
                     val arguments =
-                        commandArgs.subList(1, commandArgs.size - 1).chunked(2)
+                        commandArgs.subList(2, commandArgs.size).chunked(2)
                             .associate { it[0] to it[1] }
 
-                    val id = storage.xadd(streamKey, arguments)
-                    client.sendMessage(BulkStringRespMessage(id))
+                    client.sendMessage(storage.xadd(streamKey, entryId, arguments))
                 }
 
             }
