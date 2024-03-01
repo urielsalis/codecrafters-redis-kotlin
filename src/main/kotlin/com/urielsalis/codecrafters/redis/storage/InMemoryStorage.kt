@@ -73,20 +73,19 @@ open class InMemoryStorage : Storage {
             return ErrorRespMessage("Invalid stream ID") to null
         }
         val (idMs, idSeq) = if (entryId == "*") {
-            null to null
+            Instant.now().toEpochMilli() to null
         } else {
             try {
-                longOrNull(entryIdParts[0]) to longOrNull(entryIdParts[1])
+                longOr(entryIdParts[0], Instant.now().toEpochMilli())!! to longOr(
+                    entryIdParts[1], null
+                )
             } catch (e: IllegalArgumentException) {
                 return ErrorRespMessage("Invalid stream ID") to null
             }
         }
 
         // Validate we are greater than 0-0
-        if ((idMs != null && idMs < 0) || (idSeq != null && idSeq < 0)) {
-            return ErrorRespMessage("ERR The ID specified in XADD must be greater than 0-0") to null
-        }
-        if (idMs == null && idSeq != null) {
+        if (idMs < 0 || (idSeq != null && idSeq < 0)) {
             return ErrorRespMessage("ERR The ID specified in XADD must be greater than 0-0") to null
         }
         if (idMs == 0L && idSeq == 0L) {
@@ -106,10 +105,13 @@ open class InMemoryStorage : Storage {
         //     Current stream, so we ddo need to check
         val existingStream = currentStream as StreamRespMessage
         val maxMs = existingStream.values.maxOf { it.id.ms }
-        val maxSeq = if (idMs != null) {
-            existingStream.values.filter { it.id.ms == idMs }.maxOfOrNull { it.id.seq } ?: -1
-        } else {
+        if (idMs < maxMs) {
+            return ErrorRespMessage("ERR The ID specified in XADD is equal or smaller than the target stream top item") to null
+        }
+        val maxSeq = if (idMs == maxMs) {
             existingStream.values.filter { it.id.ms == maxMs }.maxOf { it.id.seq }
+        } else {
+            -1
         }
         val id = generateId(idMs, idSeq, maxSeq + 1)
         if (id.ms < maxMs) {
@@ -123,10 +125,7 @@ open class InMemoryStorage : Storage {
         return existingStream to id
     }
 
-    private fun generateId(idMs: Long?, idSeq: Long?, minimumSeq: Long): StreamEntryId {
-        if (idMs == null) {
-            TODO()
-        }
+    private fun generateId(idMs: Long, idSeq: Long?, minimumSeq: Long): StreamEntryId {
         if (idSeq == null) {
             if (idMs == 0L) {
                 return StreamEntryId(0, max(minimumSeq, 1))
@@ -136,9 +135,9 @@ open class InMemoryStorage : Storage {
         return StreamEntryId(idMs, idSeq)
     }
 
-    private fun longOrNull(str: String): Long? {
+    private fun longOr(str: String, or: Long?): Long? {
         if (str == "*") {
-            return null
+            return or
         }
         return try {
             str.toLong()
