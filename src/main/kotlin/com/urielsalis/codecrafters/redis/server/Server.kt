@@ -140,7 +140,12 @@ abstract class Server(
                 }
 
                 val initialMaxKeys = streamToKeys.map { (stream, keys) ->
-                    stream to keys
+                    if (keys == "$") {
+                        val maxId = storage.xmaxid(stream)
+                        stream to "${maxId.ms}-${maxId.seq}"
+                    } else {
+                        stream to keys
+                    }
                 }
                 client.sendMessage(handlexreadBlocking(blockTime, initialMaxKeys))
             }
