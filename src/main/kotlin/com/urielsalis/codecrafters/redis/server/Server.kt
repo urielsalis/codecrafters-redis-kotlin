@@ -5,6 +5,7 @@ import com.urielsalis.codecrafters.redis.resp.ArrayRespMessage
 import com.urielsalis.codecrafters.redis.resp.BulkStringRespMessage
 import com.urielsalis.codecrafters.redis.resp.ErrorRespMessage
 import com.urielsalis.codecrafters.redis.resp.NullRespMessage
+import com.urielsalis.codecrafters.redis.resp.RespMessage
 import com.urielsalis.codecrafters.redis.resp.RespOutputStream
 import com.urielsalis.codecrafters.redis.resp.SimpleStringRespMessage
 import com.urielsalis.codecrafters.redis.storage.Storage
@@ -48,166 +49,159 @@ abstract class Server(
             "echo" -> client.sendMessage(SimpleStringRespMessage(commandArgs.joinToString(" ")))
             "set" -> {
                 if (commandArgs.size < 2) {
-                    client.sendMessage(ErrorRespMessage("Wrong number of arguments for 'set' command"))
-                } else {
-                    handleSet(commandArgs)
-                    handleWriteCommand(client, command)
+                    return client.sendMessage(ErrorRespMessage("Wrong number of arguments for 'set' command"))
                 }
+                handleSet(commandArgs)
+                handleWriteCommand(client, command)
             }
 
             "get" -> {
                 if (commandArgs.size != 1) {
-                    client.sendMessage(ErrorRespMessage("Wrong number of arguments for 'get' command"))
-                } else {
-                    val value = storage.get(commandArgs[0])
-                    if (value == null) {
-                        client.sendMessage(NullRespMessage)
-                    } else {
-                        client.sendMessage(value)
-                    }
+                    return client.sendMessage(ErrorRespMessage("Wrong number of arguments for 'get' command"))
                 }
+                val value =
+                    storage.get(commandArgs[0]) ?: return client.sendMessage(NullRespMessage)
+                client.sendMessage(value)
             }
 
             "info" -> {
                 if (commandArgs.size != 1 || commandArgs[0] != "replication") {
-                    client.sendMessage(ErrorRespMessage("Unsupported info command"))
-                } else {
-                    val messages = mutableMapOf<String, String>()
-                    messages["role"] = getRole()
-                    messages["master_replid"] = replId
-                    messages["master_repl_offset"] = replOffset.toString()
-                    messages.map { (key, value) -> "$key:$value" }.joinToString("\r\n")
-                        .let { client.sendMessage(BulkStringRespMessage(it)) }
+                    return client.sendMessage(ErrorRespMessage("Unsupported info command"))
                 }
+                val messages = mutableMapOf<String, String>()
+                messages["role"] = getRole()
+                messages["master_replid"] = replId
+                messages["master_repl_offset"] = replOffset.toString()
+                messages.map { (key, value) -> "$key:$value" }.joinToString("\r\n")
+                    .let { client.sendMessage(BulkStringRespMessage(it)) }
             }
 
             "config" -> {
                 if (commandArgs.size != 2 || commandArgs[0].lowercase() != "get") {
-                    client.sendMessage(ErrorRespMessage("Unsupported config command"))
-                } else {
-                    val value = storage.getConfig(commandArgs[1])
-                    if (value == null) {
-                        client.sendMessage(NullRespMessage)
-                    } else {
-                        client.sendMessage(value)
-                    }
+                    return client.sendMessage(ErrorRespMessage("Unsupported config command"))
                 }
+                val value =
+                    storage.getConfig(commandArgs[1]) ?: return client.sendMessage(NullRespMessage)
+                client.sendMessage(value)
             }
 
             "keys" -> {
                 if (commandArgs.size != 1) {
-                    client.sendMessage(ErrorRespMessage("Wrong number of arguments for 'keys' command"))
-                } else {
-                    val keys = storage.getKeys(commandArgs[0])
-                    client.sendMessage(keys)
+                    return client.sendMessage(ErrorRespMessage("Wrong number of arguments for 'keys' command"))
                 }
+                client.sendMessage(storage.getKeys(commandArgs[0]))
             }
 
             "type" -> {
                 if (commandArgs.size != 1) {
-                    client.sendMessage(ErrorRespMessage("Wrong number of arguments for 'type' command"))
-                } else {
-                    val type = storage.getType(commandArgs[0])
-                    client.sendMessage(SimpleStringRespMessage(type))
+                    return client.sendMessage(ErrorRespMessage("Wrong number of arguments for 'type' command"))
                 }
+                client.sendMessage(SimpleStringRespMessage(storage.getType(commandArgs[0])))
             }
 
             "xadd" -> {
                 if (commandArgs.size < 2) {
-                    client.sendMessage(ErrorRespMessage("Wrong number of arguments for 'xadd' command"))
-                } else {
-                    val streamKey = commandArgs[0]
-                    val entryId = commandArgs[1]
-                    val arguments = commandArgs.subList(2, commandArgs.size).chunked(2)
-                        .associate { it[0] to it[1] }
-                    client.sendMessage(storage.xadd(streamKey, entryId, arguments))
+                    return client.sendMessage(ErrorRespMessage("Wrong number of arguments for 'xadd' command"))
                 }
+                val streamKey = commandArgs[0]
+                val entryId = commandArgs[1]
+                val arguments =
+                    commandArgs.subList(2, commandArgs.size).chunked(2).associate { it[0] to it[1] }
+                client.sendMessage(storage.xadd(streamKey, entryId, arguments))
             }
 
             "xrange" -> {
                 if (commandArgs.isEmpty()) {
-                    client.sendMessage(ErrorRespMessage("Wrong number of arguments for 'xrange' command"))
-                } else {
-                    val streamKey = commandArgs[0]
-                    val start = commandArgs.getOrNull(1)
-                    val end = commandArgs.getOrNull(2)
-                    val message = storage.xrange(streamKey, start, end)
-                    client.sendMessage(message)
+                    return client.sendMessage(ErrorRespMessage("Wrong number of arguments for 'xrange' command"))
                 }
+                val streamKey = commandArgs[0]
+                val start = commandArgs.getOrNull(1)
+                val end = commandArgs.getOrNull(2)
+                val message = storage.xrange(streamKey, start, end)
+                client.sendMessage(message)
             }
 
             "xread" -> {
                 if (commandArgs.size < 3) {
-                    client.sendMessage(ErrorRespMessage("Wrong number of arguments for 'xread' command"))
-                } else {
-                    val blockTime = if (commandArgs.contains("block")) {
-                        val value = commandArgs[commandArgs.indexOf("block") + 1].toLong()
-                        if (value > 0) {
-                            value
-                        } else {
-                            TODO()
-                            // return max :D
-                        }
-                    } else {
-                        -1L
-                    }
-                    val start = commandArgs.indexOf("streams")
-                    if (start == -1) {
-                        client.sendMessage(ErrorRespMessage("Invalid arguments for 'xread' command"))
-                    } else {
-                        val streamsAndKeys = commandArgs.subList(start + 1, commandArgs.size)
-                        val streams = streamsAndKeys.subList(0, streamsAndKeys.size / 2)
-                        val keys =
-                            streamsAndKeys.subList(streamsAndKeys.size / 2, streamsAndKeys.size)
-                        val streamToKeys = streams.zip(keys)
-
-                        if (blockTime == -1L) {
-                            val message = ArrayRespMessage(streamToKeys.map { (stream, key) ->
-                                storage.xread(stream, key)
-                            })
-                            client.sendMessage(message)
-                        } else {
-                            val initialMaxKeys = streamToKeys.map { (stream, keys) ->
-                                stream to keys
-                            }
-                            var currentTime = Instant.now().toEpochMilli()
-                            val maxTime = currentTime + blockTime
-                            var sent = false
-                            while (currentTime <= maxTime) {
-                                val message = ArrayRespMessage(initialMaxKeys.map { (stream, key) ->
-                                    storage.xread(stream, key)
-                                })
-                                if (message.values.all {
-                                        if (it !is ArrayRespMessage) {
-                                            return@all false
-                                        }
-                                        val last = message.values.lastOrNull()
-                                        if (last !is ArrayRespMessage) {
-                                            return@all false
-                                        }
-                                        val last2 = last.values.last()
-                                        if (last2 !is ArrayRespMessage) {
-                                            return@all false
-                                        }
-                                        last2.values.isNotEmpty()
-                                    }) {
-                                    sent = true
-                                    client.sendMessage(message)
-                                    break
-                                }
-                                currentTime = Instant.now().toEpochMilli()
-                            }
-                            if (!sent) {
-                                client.sendMessage(NullRespMessage)
-                            }
-                        }
-
-                    }
+                    return client.sendMessage(ErrorRespMessage("Wrong number of arguments for 'xread' command"))
                 }
+                val blockTime = getBlockTime(commandArgs)
+                val start = commandArgs.indexOf("streams")
+                if (start == -1) {
+                    return client.sendMessage(ErrorRespMessage("Invalid arguments for 'xread' command"))
+                }
+                val streamToKeys = zipStreamToKeys(commandArgs, start)
+
+                if (blockTime == -1L) {
+                    val message = ArrayRespMessage(streamToKeys.map { (stream, key) ->
+                        storage.xread(stream, key)
+                    })
+                    return client.sendMessage(message)
+                }
+
+                val initialMaxKeys = streamToKeys.map { (stream, keys) ->
+                    stream to keys
+                }
+                client.sendMessage(handlexreadBlocking(blockTime, initialMaxKeys))
             }
 
             else -> handleUnknownCommand(client, commandName, commandArgs)
         }
+    }
+
+    private fun handlexreadBlocking(
+        blockTime: Long, initialMaxKeys: List<Pair<String, String>>
+    ): RespMessage {
+        var currentTime = Instant.now().toEpochMilli()
+        val maxTime = if (blockTime == Long.MAX_VALUE) {
+            Long.MAX_VALUE
+        } else {
+            currentTime + blockTime
+        }
+        while (currentTime <= maxTime) {
+            val message = ArrayRespMessage(initialMaxKeys.map { (stream, key) ->
+                storage.xread(stream, key)
+            })
+            if (message.values.all {
+                    if (it !is ArrayRespMessage) {
+                        return@all false
+                    }
+                    val last = message.values.lastOrNull()
+                    if (last !is ArrayRespMessage) {
+                        return@all false
+                    }
+                    val last2 = last.values.last()
+                    if (last2 !is ArrayRespMessage) {
+                        return@all false
+                    }
+                    last2.values.isNotEmpty()
+                }) {
+                return message
+            }
+            currentTime = Instant.now().toEpochMilli()
+        }
+        return NullRespMessage
+    }
+
+    private fun zipStreamToKeys(
+        commandArgs: List<String>, start: Int
+    ): List<Pair<String, String>> {
+        val streamsAndKeys = commandArgs.subList(start + 1, commandArgs.size)
+        val streams = streamsAndKeys.subList(0, streamsAndKeys.size / 2)
+        val keys = streamsAndKeys.subList(streamsAndKeys.size / 2, streamsAndKeys.size)
+        val streamToKeys = streams.zip(keys)
+        return streamToKeys
+    }
+
+    private fun getBlockTime(commandArgs: List<String>) = if (commandArgs.contains("block")) {
+        val value = commandArgs[commandArgs.indexOf("block") + 1].toLong()
+        if (value > 0) {
+            value
+        } else {
+            Long.MAX_VALUE
+        }
+    } else {
+        -1L
     }
 
     protected fun parseCommand(command: ArrayRespMessage): Pair<String, List<String>> {
