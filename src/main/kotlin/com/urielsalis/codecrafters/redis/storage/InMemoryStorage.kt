@@ -79,7 +79,7 @@ open class InMemoryStorage : Storage {
             }
             StreamEntryId(parts[0].toLong(), parts[1].toLong())
         }
-        val maxId = if (end == null) {
+        val maxId = if (end == null || end == "+") {
             StreamEntryId(Long.MAX_VALUE, Long.MAX_VALUE)
         } else {
             val parts = end.split("-")
